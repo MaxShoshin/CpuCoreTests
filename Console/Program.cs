@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Threading;
 
@@ -10,10 +9,13 @@ namespace CpuThreadingTest.ConsoleApp
     internal static class Program
     {
         private const int RepeatCount = 5;
-        private const double DefaultTestSeconds = 15;
+        private const double DefaultTestSeconds = 1;
 
         private static readonly ThreadPriority ThreadPriority = ThreadPriority.Normal;
         private static readonly int ProcessorCount = Environment.ProcessorCount;
+
+        private static int _readyCount;
+        private static int _finished;
 
         public static void Main(string[] args)
         {
@@ -33,13 +35,9 @@ namespace CpuThreadingTest.ConsoleApp
                 var timeToRunTests = TimeSpan.FromSeconds(3 * testSeconds * repeatCountPerSuite * RepeatCount);
                 Reporter.DisplayBeforeTestInfo(testSeconds, timeToRunTests);
 
-                for (int i = 0; i < RepeatCount; i++)
-                {
-                    Reporter.DisplayTestRetry(i, RepeatCount);
-                    PerformTest<MathWorker>(testSeconds);
-                    PerformTest<LocalMemoryWorker>(testSeconds);
-                    PerformTest<FarMemoryWorker>(testSeconds);
-                }
+                PerformTest<MathWorker>(testSeconds);
+                PerformTest<LocalMemoryWorker>(testSeconds);
+                PerformTest<FarMemoryWorker>(testSeconds);
 
                 Reporter.DisplayBye();
             }
@@ -66,24 +64,21 @@ namespace CpuThreadingTest.ConsoleApp
 
             var matrix = new double[ProcessorCount, ProcessorCount];
 
-            using (new GCInfo())
+            for (var i = 0; i < ProcessorCount; i++)
             {
-                for (var i = 0; i < ProcessorCount; i++)
+                for (var j = i; j < ProcessorCount; j++)
                 {
-                    for (var j = i; j < ProcessorCount; j++)
-                    {
-                        Func<int, bool> coreSelector = index => index == i || index == j;
+                    Func<int, bool> coreSelector = index => index == i || index == j;
 
-                        var results = RunTest(coreSelector, workers, secondsPerTest);
+                    var results = RunTest(coreSelector, workers, secondsPerTest);
 
-                        matrix[i, j] = results.Select(x => x.Report.OpsPerMs).Average();
+                    matrix[i, j] = results.Select(x => x.Report.OpsPerMs).Average();
 
-                        Reporter.DisplayOneMatrixTestDone();
-                    }
+                    Reporter.DisplayOneMatrixTestDone();
                 }
-
-                Reporter.DisplayMatrixTestsDone();
             }
+
+            Reporter.DisplayMatrixTestsDone();
 
             Reporter.DisplayMatrixResults(matrix, ProcessorCount);
 
@@ -98,35 +93,72 @@ namespace CpuThreadingTest.ConsoleApp
         {
             Reporter.DisplayTestInfo(description, typeof(TWorker).Name);
 
-            IReadOnlyList<WorkerArgs> args;
-            using (new GCInfo())
-            {
-                args = action();
-            }
-
+            var args = action();
 
             Reporter.DisplayResults(args);
         }
 
         private static IReadOnlyList<WorkerArgs> RunTest(Func<int, bool> coreSelector, IReadOnlyList<IWorker> workers, double testSeconds)
         {
-            var cancelSource = new CancellationTokenSource();
+            var bestResultMetric = double.MaxValue;
+            IReadOnlyList<WorkerArgs> bestResults = null;
 
-            var workerArgs = Enumerable.Range(0, ProcessorCount)
-                .Where(coreSelector)
-                .Select(index => new WorkerArgs(workers[index], CreateThread(), index, cancelSource.Token))
+            for (int i = 0; i < RepeatCount; i++)
+            {
+                var results = RunSingleBenchmark(coreSelector, workers, testSeconds);
+                var resultMetric = results.Select(result => result.Report.OpsPerMs).Sum();
+
+                if (resultMetric < bestResultMetric)
+                {
+                    bestResults = results;
+                    bestResultMetric = resultMetric;
+                }
+            }
+
+            return bestResults;
+        }
+
+        private static IReadOnlyList<WorkerArgs> RunSingleBenchmark(Func<int, bool> coreSelector, IReadOnlyList<IWorker> workers, double testSeconds)
+        {
+            Volatile.Write(ref _finished, 0);
+            Volatile.Write(ref _readyCount, 0);
+
+            var coreIndexes = Enumerable.Range(0, ProcessorCount)
+                .Where(coreSelector).ToList();
+
+            var workerArgs = coreIndexes
+                .Select(index => new WorkerArgs(workers[index], CreateThread(), index, coreIndexes.Count))
                 .ToList();
+
+            GC.Collect(2);
+
+            var beforeGc0 = GC.CollectionCount(0);
+            var beforeGc1 = GC.CollectionCount(1);
+            var beforeGc2 = GC.CollectionCount(2);
 
             foreach (var workerArg in workerArgs)
             {
                 workerArg.Thread.Start(workerArg);
             }
 
+            var cancelSource = new CancellationTokenSource();
+            cancelSource.Token.Register(() => Volatile.Write(ref _finished, 1));
             cancelSource.CancelAfter(TimeSpan.FromSeconds(testSeconds));
 
             foreach (var workerArg in workerArgs)
             {
                 workerArg.Thread.Join();
+            }
+
+            var afterGc0 = GC.CollectionCount(0);
+            var afterGc1 = GC.CollectionCount(1);
+            var afterGc2 = GC.CollectionCount(2);
+
+            foreach (var workerArg in workerArgs)
+            {
+                workerArg.Report.GC0Count = afterGc0 - beforeGc0;
+                workerArg.Report.GC1Count = afterGc1 - beforeGc1;
+                workerArg.Report.GC2Count = afterGc2 - beforeGc2;
             }
 
             return workerArgs;
@@ -156,33 +188,47 @@ namespace CpuThreadingTest.ConsoleApp
 
             int switchCount = 0;
 
-            var processorTimeOnStart = currentThread.TotalProcessorTime;
-
+            bool ready = false;
             var count = 0;
+            var beforeProcessorTime = TimeSpan.Zero;
             var stopwatch = Stopwatch.StartNew();
 
-            while (!workerArgs.CancellationToken.IsCancellationRequested)
-            {
-                SystemInfoHelper.GetCurrentProcessorNumberEx(ref processorNumber);
-                if (processorNumber.Number != procNumber)
-                {
-                    switchCount++;
-                }
+            Interlocked.Increment(ref _readyCount);
 
+            while (Volatile.Read(ref _finished) == 0)
+            {
                 workerArgs.Worker.DoWork();
-                count++;
+
+                if (ready)
+                {
+                    count++;
+                }
+                else
+                {
+                    if (Volatile.Read(ref _readyCount) == workerArgs.WorkerCount)
+                    {
+                        beforeProcessorTime = currentThread.UserProcessorTime;
+                        stopwatch.Restart();
+                        ready = true;
+                    }
+                }
             }
 
+            var afterProcessorTime = currentThread.UserProcessorTime;
             stopwatch.Stop();
 
-            var processorTime = currentThread.TotalProcessorTime - processorTimeOnStart;
+            SystemInfoHelper.GetCurrentProcessorNumberEx(ref processorNumber);
+            if (processorNumber.Number != procNumber)
+            {
+                switchCount++;
+            }
 
             var report = workerArgs.Report;
 
             report.OperationsCount = count;
             report.Elapsed = stopwatch.Elapsed;
+            report.ProcessorTime = afterProcessorTime - beforeProcessorTime;
             report.CoreSwitchCount = switchCount;
-            report.ProcessorTime = processorTime;
         }
     }
 }

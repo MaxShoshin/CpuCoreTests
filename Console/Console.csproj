@@ -40,7 +40,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="GCInfo.cs" />
     <Compile Include="LocalMemoryWorker.cs" />
     <Compile Include="MathWorker.cs" />
     <Compile Include="MemoryStepper.cs" />

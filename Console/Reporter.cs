@@ -334,23 +334,21 @@ namespace CpuThreadingTest.ConsoleApp
                     ? ConsoleColor.DarkRed
                     : ConsoleColor.Green;
 
-                Console.WriteLine($"{report.CoreIndex:D2}: {report.Elapsed:G} Operations: {report.OperationsCount}; Switches: {report.CoreSwitchCount}. Processor time: {report.ProcessorTime}. Ops/ms: {report.OpsPerMs}");
+                Console.WriteLine($"{report.CoreIndex:D2}: {report.Elapsed:G} Operations: {report.OperationsCount}; Switches: {report.CoreSwitchCount}. Ops/ms: {report.OpsPerMs}");
             }
 
             Console.ForegroundColor = DefaultColor;
+
+            var gcInfo = workerArgs.First();
+
+            Console.WriteLine("GCs during test: {0}/{1}/{2}", gcInfo.Report.GC0Count, gcInfo.Report.GC1Count, gcInfo.Report.GC2Count);
+
             Console.WriteLine("Done.");
         }
 
         public static void DisplayTestGroupComplete()
         {
             Console.WriteLine();
-            Console.WriteLine();
-        }
-
-        public static void DisplayTestRetry(int i, int repeatCount)
-        {
-            Console.WriteLine("===================================================================");
-            Console.WriteLine($"Repeat {i+1} of {repeatCount}");
             Console.WriteLine();
         }
     }

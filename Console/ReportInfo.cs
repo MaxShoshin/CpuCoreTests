@@ -15,5 +15,9 @@ namespace CpuThreadingTest.ConsoleApp
         public TimeSpan Elapsed { get; set; }
         public TimeSpan ProcessorTime { get; set; }
         public double OpsPerMs => OperationsCount / ProcessorTime.TotalMilliseconds;
+
+        public int GC0Count { get; set; }
+        public int GC1Count { get; set; }
+        public int GC2Count { get; set; }
     }
 }
