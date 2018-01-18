@@ -6,7 +6,6 @@ namespace CpuThreadingTest.ConsoleApp
     internal sealed class FarMemoryWorker : IWorker
     {
         private const int DwordsCount = 1024 * 1024 * 1024 * 1 / 4; //1Gb
-        private const int Step = 10343;
 
         private static readonly Random Rnd = new Random();
         private static readonly int[] Memory;
@@ -39,10 +38,9 @@ namespace CpuThreadingTest.ConsoleApp
 
             _next = MemoryStepper.Next(_next, _forward, Memory.Length);
         }
-    }
 
-    internal interface IWorker
-    {
-        void DoWork();
+        public void Warm()
+        {
+        }
     }
 }

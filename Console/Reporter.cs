@@ -237,29 +237,42 @@ namespace CpuThreadingTest.ConsoleApp
 
         public static void DisplayMatrixResults(double[,] matrix, int processorCount)
         {
-            Console.Write("    | ");
-            for (var i = 0; i < processorCount; i++)
+            if (Console.WindowWidth < 11 + processorCount * 6)
             {
-                Console.Write($"{i,12:#########0}  | ");
+                Console.WriteLine("... matrix will be displayed incorrectly. please increase console width.");
             }
 
+            var percentMatrix = ConvertToPercent(matrix, processorCount);
+
+            Console.Write("   | ");
+            for (var i = 0; i < processorCount; i++)
+            {
+                Console.Write($"{i,3:##0} | ");
+            }
             Console.WriteLine();
 
-            var mins = CalculateRowMins(matrix, processorCount);
+            Console.Write("---|");
+            for (var i = 0; i < processorCount; i++)
+            {
+                Console.Write($"-----|");
+            }
+            Console.WriteLine();
+
+            var mins = CalculateRowMins(percentMatrix, processorCount);
 
             for (var i = 0; i < processorCount; i++)
             {
-                Console.Write($"{i,2}  | ");
+                Console.Write($"{i,2} | ");
 
                 for (var j = 0; j < processorCount; j++)
                 {
                     if (i > j)
                     {
-                        Console.Write("            ");
+                        Console.Write("   ");
                     }
                     else
                     {
-                        if (mins[i] == matrix[i,j])
+                        if (mins[i] == percentMatrix[i,j])
                         {
                             Console.ForegroundColor = ConsoleColor.DarkRed;
                         }
@@ -269,23 +282,55 @@ namespace CpuThreadingTest.ConsoleApp
                             Console.ForegroundColor = ConsoleColor.DarkCyan;
                         }
 
-                        Console.Write($"{matrix[i, j],12:0.000}");
+                        Console.Write($"{percentMatrix[i, j],3:0}");
                         Console.ForegroundColor = DefaultColor;
                     }
 
-                    Console.Write("  | ");
+                    Console.Write(" | ");
                 }
 
                 Console.WriteLine();
             }
         }
 
-        private static double[] CalculateRowMins(double[,] matrix, int processorCount)
+        public static void DisplayTestGroupComplete()
         {
-            var mins = new double[processorCount];
+            Console.WriteLine();
+            Console.WriteLine();
+        }
+
+        private static int[,] ConvertToPercent(double[,] matrix, int processorCount)
+        {
+            var max = double.MinValue;
+            for (var i = 0; i < processorCount; i++)
+            {
+                for (var j = i; j < processorCount; j++)
+                {
+                    if (max < matrix[i, j])
+                    {
+                        max = matrix[i, j];
+                    }
+                }
+            }
+
+            var percents = new int[processorCount, processorCount];
+            for (var i = 0; i < processorCount; i++)
+            {
+                for (var j = i; j < processorCount; j++)
+                {
+                    percents[i, j] = (int)Math.Round(matrix[i, j] / max * 100);
+                }
+            }
+
+            return percents;
+        }
+
+        private static int[] CalculateRowMins(int[,] matrix, int processorCount)
+        {
+            var mins = new int[processorCount];
             for (int i = 0; i < processorCount; i++)
             {
-                var min = double.MaxValue;
+                var min = int.MaxValue;
 
                 for (int j = 0; j < processorCount; j++)
                 {
@@ -309,47 +354,6 @@ namespace CpuThreadingTest.ConsoleApp
             }
 
             return mins;
-        }
-
-
-
-        public static void DisplayTestInfo(string description, string workerName)
-        {
-            Console.WriteLine();
-            Console.WriteLine($"Start {workerName} tests... ({description})");
-        }
-
-        public static void DisplayResults(IReadOnlyList<WorkerArgs> workerArgs)
-        {
-            var badReports = workerArgs.Select(x => x.Report)
-                .OrderBy(report => report.OpsPerMs)
-                .Take(workerArgs.Count / 2)
-                .ToList();
-
-            foreach (var workerArg in workerArgs)
-            {
-                var report = workerArg.Report;
-
-                Console.ForegroundColor = badReports.Contains(report)
-                    ? ConsoleColor.DarkRed
-                    : ConsoleColor.Green;
-
-                Console.WriteLine($"{report.CoreIndex:D2}: {report.Elapsed:G} Operations: {report.OperationsCount}; Switches: {report.CoreSwitchCount}. Ops/ms: {report.OpsPerMs}");
-            }
-
-            Console.ForegroundColor = DefaultColor;
-
-            var gcInfo = workerArgs.First();
-
-            Console.WriteLine("GCs during test: {0}/{1}/{2}", gcInfo.Report.GC0Count, gcInfo.Report.GC1Count, gcInfo.Report.GC2Count);
-
-            Console.WriteLine("Done.");
-        }
-
-        public static void DisplayTestGroupComplete()
-        {
-            Console.WriteLine();
-            Console.WriteLine();
         }
     }
 }

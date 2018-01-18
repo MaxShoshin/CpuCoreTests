@@ -4,6 +4,7 @@ namespace CpuThreadingTest.ConsoleApp
 {
     internal sealed class MathWorker : IWorker
     {
+        private static int WarmCount = 20000000;
         private double _x;
         private int _i = 1;
 
@@ -17,6 +18,15 @@ namespace CpuThreadingTest.ConsoleApp
                 _i = 0;
                 _x= Math.Sqrt(_i);
                 _x += _x;
+            }
+        }
+
+        public void Warm()
+        {
+            // Warm cores to enable
+            for (int i = 0; i < WarmCount; i++)
+            {
+                DoWork();
             }
         }
 

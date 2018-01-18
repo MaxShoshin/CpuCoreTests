@@ -19,7 +19,7 @@ namespace CpuThreadingTest.ConsoleApp
 
             next += addToNext;
 
-            if (next >= memoryLength)
+            while (next >= memoryLength)
             {
                 next -= memoryLength;
             }

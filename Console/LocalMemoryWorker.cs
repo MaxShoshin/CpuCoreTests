@@ -33,5 +33,9 @@ namespace CpuThreadingTest.ConsoleApp
 
             _next = MemoryStepper.Next(_next, _forward, _memory.Length);
         }
+
+        public void Warm()
+        {
+        }
     }
 }
