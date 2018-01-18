@@ -7,7 +7,7 @@ namespace CpuThreadingTest.ConsoleApp
 {
     internal static class Program
     {
-        private const double DefaultTestSeconds = 1;
+        private const double DefaultTestSeconds = 3;
 
 
         private static int _readyCount;
@@ -24,13 +24,15 @@ namespace CpuThreadingTest.ConsoleApp
                     Reporter.DisplayUsage();
                 }
 
-                Reporter.DisplayCpuInfo();
+                CpuInfoReporter.DisplayCpuInfo();
 
                 var timeToRunTests =
-                    HyperthreadingDetectorTests.CalculateTime(testSeconds);
+                    HyperthreadingDetectorTests.CalculateTime(testSeconds) +
+                    NumaNodeDetectorTests.CalculateTime(testSeconds);
 
                 Reporter.DisplayBeforeTestInfo(testSeconds, timeToRunTests);
 
+                NumaNodeDetectorTests.Perform(testSeconds);
                 HyperthreadingDetectorTests.Perform(testSeconds);
 
                 Reporter.DisplayBye();

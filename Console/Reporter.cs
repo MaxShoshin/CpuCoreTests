@@ -10,7 +10,6 @@ namespace CpuThreadingTest.ConsoleApp
 {
     internal static class Reporter
     {
-        private const UInt64 Int64Lastbit = 9223372036854775808;
         private const double Tolerance = 0.0000001;
 
         private static readonly ConsoleColor DefaultColor;
@@ -35,160 +34,6 @@ namespace CpuThreadingTest.ConsoleApp
             Console.WriteLine();
         }
 
-        public static void DisplayCpuInfo()
-        {
-            Console.WriteLine("General processor info:");
-
-            Console.WriteLine("  Processor count (WMI): {0}", SystemInfoHelper.WmiPhysicalProcessorCount);
-            Console.WriteLine("  Core count/processor (WMI): {0}",SystemInfoHelper.WmiCoreCount );
-            Console.WriteLine("  Global logical processors (WMI): {0}", SystemInfoHelper.WmiGlobalLogicalProcessorCount);
-            Console.WriteLine("  Global logical processors (Environment.LogicalProcessorCount): {0}", Environment.ProcessorCount);
-
-            var activeProcessorGroupCount = SystemInfoHelper.GetActiveProcessorGroupCount();
-
-
-            var sb = new StringBuilder();
-            for (UInt16 groupIndex = 0; groupIndex < activeProcessorGroupCount; groupIndex++)
-            {
-                if (sb.Length > 0)
-                {
-                    sb.AppendLine();
-                    sb.Append("      ");
-                }
-
-                sb.AppendFormat("Group '{0}' as ", groupIndex);
-
-                UInt32 processorCount = SystemInfoHelper.GetActiveProcessorCount(groupIndex);
-                if (processorCount == 0)
-                {
-                    sb.AppendFormat("Error reading GetActiveProcessorCount: {0}", Marshal.GetLastWin32Error());
-                }
-                else
-                {
-                    sb.AppendFormat("{0} Logical Processors", processorCount);
-                }
-            }
-
-            Console.WriteLine("  Active Processor group count (pinvoke kernel32): {0}", activeProcessorGroupCount);
-            Console.WriteLine("  Logical Processor count per group (pinvoke kernel32): {0}", sb);
-
-            Console.WriteLine("  Maximum Processor group count (pinvoke kernel32): {0}", SystemInfoHelper.GetMaximumProcessorGroupCount());
-
-
-            int workerThreads;
-            int completionPortThreads;
-            ThreadPool.GetMaxThreads(out workerThreads, out completionPortThreads);
-            Console.WriteLine("  Thread pool Max Threads - workerThreads: {0}", workerThreads);
-            Console.WriteLine("  Thread pool Max Threads - completionPortThreads: {0}", completionPortThreads);
-
-            UInt64 processAffinityMask;
-            UInt64 systemAffinityMask;
-
-            bool isResultOk = SystemInfoHelper.GetProcessAffinityMask(
-                System.Diagnostics.Process.GetCurrentProcess().Handle,
-                out processAffinityMask,
-                out systemAffinityMask);
-
-            if (isResultOk)
-            {
-                Console.WriteLine("  Process Affinity Mask (pinvoke kernel32): {0:x8} (bit count: {1}, mask: {2})", processAffinityMask, GetBitCount(processAffinityMask), GetBitString(processAffinityMask));
-                Console.WriteLine("  System Affinity Mask (pinvoke kernel32): {0:x8} (bit count: {1}, mask: {2})", systemAffinityMask, GetBitCount(systemAffinityMask), GetBitString(systemAffinityMask));
-            }
-            else
-            {
-                var error = Marshal.GetLastWin32Error();
-                Console.WriteLine("  GetProcessAffinityMask() error = {0}", error);
-            }
-
-
-            var numaHighestNodeNumber = SystemInfoHelper.NumaHighestNodeNumber;
-
-            Console.WriteLine("  Highest Numa Node Number (pinvoke kernel32)    0 Based: {0}", numaHighestNodeNumber);
-
-            Console.WriteLine("  NUMA nodes and their associated Processor Mask (pinvoke kernel32):");
-            for (int nodeIndex = 0; nodeIndex <= numaHighestNodeNumber; nodeIndex++)
-            {
-                UInt64 numaNodeProcessorMask;
-                isResultOk = SystemInfoHelper.GetNumaNodeProcessorMask((byte) nodeIndex, out numaNodeProcessorMask);
-                if (isResultOk)
-                {
-                    Console.WriteLine("  Node: {0} Processor Mask: {1:x8} (bit count: {2}, mask: {3})", nodeIndex, numaNodeProcessorMask, GetBitCount(numaNodeProcessorMask), GetBitString(numaNodeProcessorMask));
-                }
-                else
-                {
-                    var error = Marshal.GetLastWin32Error();
-                    Console.WriteLine("  GetNumaNodeProcessorMask({1}) error = {0}", error, nodeIndex);
-                }
-            }
-
-            Console.WriteLine();
-            var structLogProcInfo = SystemInfoHelper.GetLogicalProcessorInformation();
-            foreach (var procInfo in structLogProcInfo)
-            {
-                var processorMask = GetBitString((ulong)procInfo.ProcessorMask);
-                Console.Write($"  Processor mask: {processorMask} ");
-
-                switch (procInfo.Relationship)
-                {
-                    case SystemInfoHelper.LOGICAL_PROCESSOR_RELATIONSHIP.RelationProcessorCore:
-                        Console.WriteLine("Core.");
-                        break;
-                    case SystemInfoHelper.LOGICAL_PROCESSOR_RELATIONSHIP.RelationNumaNode:
-                        Console.WriteLine($"NumaNode {procInfo.ProcessorInformation.NumaNode.NodeNumber}");
-                        break;
-                    case SystemInfoHelper.LOGICAL_PROCESSOR_RELATIONSHIP.RelationCache:
-                        var cache = procInfo.ProcessorInformation.Cache;
-                        Console.WriteLine($"Cache level {cache.Level}, size {cache.Size / 1024}Kb, line size: {cache.LineSize} type: {cache.Type}");
-                        break;
-                    case SystemInfoHelper.LOGICAL_PROCESSOR_RELATIONSHIP.RelationProcessorPackage:
-                        Console.WriteLine($"Processor package.");
-                        break;
-                    case SystemInfoHelper.LOGICAL_PROCESSOR_RELATIONSHIP.RelationGroup:
-                        Console.WriteLine($"Relation group.");
-                        break;
-                    case SystemInfoHelper.LOGICAL_PROCESSOR_RELATIONSHIP.RelationAll:
-                        Console.WriteLine($"Relation all.");
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException();
-                }
-            }
-        }
-
-        private static int GetBitCount(UInt64 number)
-        {
-            int count = 0;
-            while (number != 0)
-            {
-                if ((number & 1) == 1)
-                {
-                    count++;
-                }
-                number = number >> 1;
-            }
-            return count;
-        }
-
-        private static string GetBitString(UInt64 number)
-        {
-            var sb = new StringBuilder();
-            UInt64 bit = Int64Lastbit;
-
-            for(int index = 0; index < 64; index++)
-            {
-                if ((number & bit) > 0)
-                {
-                    sb.Append('1');
-                }
-                else
-                {
-                    sb.Append('-');
-                }
-                bit = bit >> 1;
-            }
-
-            return sb.ToString();
-        }
 
         public static void DisplayBeforeTestInfo(double testSeconds, TimeSpan timeToRunTests)
         {
@@ -198,11 +43,6 @@ namespace CpuThreadingTest.ConsoleApp
 
             Console.WriteLine("It will take around: {0}", timeToRunTests );
             Console.WriteLine();
-            Console.WriteLine();
-
-            Console.WriteLine("MathWorker tests tries to do some mathematical computation. These tests will detect hyperthreading cores.");
-            Console.WriteLine("LocalMemoryWorker tests tries to operate with local to core memory. These tests can be used as baseline for NUMA detection tests.");
-            Console.WriteLine("FarMemoryWorker tests operates with the shared between all cores memory. This test can detect NUMA groups of processors.");
             Console.WriteLine();
         }
 
@@ -220,18 +60,26 @@ namespace CpuThreadingTest.ConsoleApp
             Console.ForegroundColor = DefaultColor;
         }
 
-        public static void DisplayPairTest(string workerName)
+        public static void DisplayStartTests(string testName)
         {
-            Console.WriteLine($"Testing core pairs {workerName}...");
+            Console.WriteLine($"Performing {testName} tests..." );
+
         }
 
-        public static void DisplayOneMatrixTestDone()
+        public static void DisplayOneTestItemDone()
         {
             Console.Write(".");
         }
 
-        public static void DisplayMatrixTestsDone()
+        public static void DisplayProgressBar(int count)
         {
+            Console.Write(new string('-', count));
+            Console.SetCursorPosition(0, Console.CursorTop);
+        }
+
+        public static void DisplayComplete()
+        {
+            Console.WriteLine();
             Console.WriteLine();
         }
 
@@ -242,21 +90,12 @@ namespace CpuThreadingTest.ConsoleApp
                 Console.WriteLine("... matrix will be displayed incorrectly. please increase console width.");
             }
 
+            Console.WriteLine("Performing math operations simultaniously on two nearest hyperthreading cores leads to perf degradation.");
+            Console.WriteLine("Performacnce (%) when every 2 CPU cores perform mathematical :.");
+
             var percentMatrix = ConvertToPercent(matrix, processorCount);
 
-            Console.Write("   | ");
-            for (var i = 0; i < processorCount; i++)
-            {
-                Console.Write($"{i,3:##0} | ");
-            }
-            Console.WriteLine();
-
-            Console.Write("---|");
-            for (var i = 0; i < processorCount; i++)
-            {
-                Console.Write($"-----|");
-            }
-            Console.WriteLine();
+            DisplayTableHeader(processorCount);
 
             var mins = CalculateRowMins(percentMatrix, processorCount);
 
@@ -291,6 +130,25 @@ namespace CpuThreadingTest.ConsoleApp
 
                 Console.WriteLine();
             }
+        }
+
+        private static void DisplayTableHeader(int processorCount)
+        {
+            Console.Write("   | ");
+            for (var i = 0; i < processorCount; i++)
+            {
+                Console.Write($"{i,3:##0} | ");
+            }
+
+            Console.WriteLine();
+
+            Console.Write("---|");
+            for (var i = 0; i < processorCount; i++)
+            {
+                Console.Write($"-----|");
+            }
+
+            Console.WriteLine();
         }
 
         public static void DisplayTestGroupComplete()
@@ -354,6 +212,38 @@ namespace CpuThreadingTest.ConsoleApp
             }
 
             return mins;
+        }
+
+        public static void DisplayInitializing()
+        {
+            Console.WriteLine("Initialization...");
+        }
+
+        public static void DisplayPerforming()
+        {
+            Console.WriteLine("Performing tests...");
+        }
+
+        public static void DisplayNumaTestResults(double[] results)
+        {
+            Console.WriteLine();
+            Console.WriteLine("Accessing to the 'local' memory for NUMA socket is faster than accessing to the ");
+            Console.WriteLine("other's NUMA socket memory.");
+            Console.WriteLine("Performance per CPU core (%) for memory access (allocated once before start):");
+
+            DisplayTableHeader(results.Length);
+            Console.Write("   | ");
+
+            var max = results.Max();
+
+            for (int i = 0; i < results.Length; i++)
+            {
+                var percent = (int)Math.Round(results[i] * 100 / max);
+                Console.Write($"{percent,3:0} | ");
+            }
+
+            Console.WriteLine();
+            Console.WriteLine();
         }
     }
 }

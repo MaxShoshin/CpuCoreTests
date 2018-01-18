@@ -23,7 +23,9 @@ namespace CpuThreadingTest.ConsoleApp
 
         public static void Perform(double secondsPerTest)
         {
-            Reporter.DisplayPairTest("Hyperthreading");
+            Reporter.DisplayStartTests("Hyperthreading");
+
+            Reporter.DisplayProgressBar((1 + ProcessorCount) * ProcessorCount / 2);
 
             for (var i = 0; i < ProcessorCount; i++)
             {
@@ -31,15 +33,22 @@ namespace CpuThreadingTest.ConsoleApp
                 {
                     RunSingleBenchmark(i, j, secondsPerTest);
 
-                    Reporter.DisplayOneMatrixTestDone();
+                    Reporter.DisplayOneTestItemDone();
                 }
             }
 
-            Reporter.DisplayMatrixTestsDone();
+            Reporter.DisplayComplete();
 
             Reporter.DisplayMatrixResults(_coreResults, ProcessorCount);
 
             Reporter.DisplayTestGroupComplete();
+        }
+
+        public static TimeSpan CalculateTime(double testSeconds)
+        {
+            var repeatCountPerSuite = (1 + ProcessorCount) * ProcessorCount / 2;
+
+            return TimeSpan.FromSeconds((testSeconds * RepeatCount + WarmSeconds) * repeatCountPerSuite);
         }
 
         private static void RunSingleBenchmark(int firstCore, int secondCore, double testSeconds)
@@ -143,13 +152,6 @@ namespace CpuThreadingTest.ConsoleApp
             stopwatch.Stop();
 
             return count;
-        }
-
-        public static TimeSpan CalculateTime(double testSeconds)
-        {
-            var repeatCountPerSuite = (1 + ProcessorCount) * ProcessorCount / 2;
-
-            return TimeSpan.FromSeconds((testSeconds * RepeatCount + WarmSeconds) * repeatCountPerSuite);
         }
     }
 }
