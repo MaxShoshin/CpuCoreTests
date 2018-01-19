@@ -24,7 +24,11 @@ namespace CpuThreadingTest.ConsoleApp
             var exeName = Path.GetFileName(typeof(Program).Assembly.Location);
 
             Console.WriteLine("Usage:");
-            Console.WriteLine($"  {exeName} [secondsPerTests]");
+            Console.WriteLine($"  {exeName} [secondsPerTests] [detectorType1 [detectorType2..]]");
+            Console.WriteLine("      where detectorType1, detectorType2 can be one of:");
+            Console.WriteLine("         CpuInfo        - display CPU information");
+            Console.WriteLine("         Hyperthreading - run tests to detect hyperthreading cores");
+            Console.WriteLine("         NUMA           - run tests to detect cores on different NUMA sockets");
             Console.WriteLine();
         }
 

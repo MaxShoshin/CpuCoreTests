@@ -5,13 +5,12 @@ namespace CpuThreadingTest.ConsoleApp
 {
     internal static class MemoryStepper
     {
-        private const int Step = 16777216;
-        private static readonly Random Rnd = new Random();
+        private const int Step = 17 * 1024 * 1024 / 4; // 17Mb
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int Next(int next, bool forward, int memoryLength)
         {
-            var addToNext = Rnd.Next(Step / 2, Step);
+            var addToNext = Step;
             if (!forward)
             {
                 addToNext = -addToNext;

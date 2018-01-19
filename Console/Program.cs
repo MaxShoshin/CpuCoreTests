@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Linq;
 using System.Threading;
 
@@ -7,33 +8,42 @@ namespace CpuThreadingTest.ConsoleApp
 {
     internal static class Program
     {
-        private const double DefaultTestSeconds = 3;
-
-
-        private static int _readyCount;
-
         public static void Main(string[] args)
         {
             Reporter.DisplayHello();
 
             try
             {
-                var testSeconds = DefaultTestSeconds;
-                if (args.Length != 1 || !double.TryParse(args[0], out testSeconds))
+                var runConfig = RunConfiguration.ParseFromCommandLine(args);
+
+                if (runConfig.DisplayUsage)
                 {
                     Reporter.DisplayUsage();
                 }
 
-                CpuInfoReporter.DisplayCpuInfo();
+                if (runConfig.Exit)
+                {
+                    return;
+                }
 
-                var timeToRunTests =
-                    HyperthreadingDetectorTests.CalculateTime(testSeconds) +
-                    NumaNodeDetectorTests.CalculateTime(testSeconds);
+                var detectors = runConfig.InstantiateDetectors();
 
-                Reporter.DisplayBeforeTestInfo(testSeconds, timeToRunTests);
+                var timeToRunTests = TimeSpan.Zero;
 
-                NumaNodeDetectorTests.Perform(testSeconds);
-                HyperthreadingDetectorTests.Perform(testSeconds);
+                foreach (var detector in detectors)
+                {
+                    timeToRunTests += detector.CalculateTime(runConfig.SecondsPerMeasure, runConfig.WarmingSeconds);
+                }
+
+                if (timeToRunTests > TimeSpan.Zero)
+                {
+                    Reporter.DisplayBeforeTestInfo(runConfig.SecondsPerMeasure, timeToRunTests);
+                }
+
+                foreach (var detector in detectors)
+                {
+                    detector.Perform(runConfig.SecondsPerMeasure, runConfig.WarmingSeconds);
+                }
 
                 Reporter.DisplayBye();
             }

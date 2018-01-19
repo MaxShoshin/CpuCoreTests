@@ -4,12 +4,11 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 
-namespace CpuThreadingTest.ConsoleApp
+namespace CpuThreadingTest.ConsoleApp.Detectors
 {
-    internal static class HyperthreadingDetectorTests
+    internal sealed class HyperthreadingDetector : IDetector
     {
         private const int RepeatCount = 5;
-        private const int WarmSeconds = 5;
 
         private static readonly int ProcessorCount = Environment.ProcessorCount;
         private static int _readyToPhase;
@@ -21,7 +20,7 @@ namespace CpuThreadingTest.ConsoleApp
 
         private static CancellationTokenSource _cancelSource;
 
-        public static void Perform(double secondsPerTest)
+        public void Perform(double secondsPerTest, double warmSeconds)
         {
             Reporter.DisplayStartTests("Hyperthreading");
 
@@ -31,7 +30,7 @@ namespace CpuThreadingTest.ConsoleApp
             {
                 for (var j = i; j < ProcessorCount; j++)
                 {
-                    RunSingleBenchmark(i, j, secondsPerTest);
+                    RunSingleBenchmark(i, j, secondsPerTest, warmSeconds);
 
                     Reporter.DisplayOneTestItemDone();
                 }
@@ -44,14 +43,14 @@ namespace CpuThreadingTest.ConsoleApp
             Reporter.DisplayTestGroupComplete();
         }
 
-        public static TimeSpan CalculateTime(double testSeconds)
+        public TimeSpan CalculateTime(double testSeconds, double warmSeconds)
         {
             var repeatCountPerSuite = (1 + ProcessorCount) * ProcessorCount / 2;
 
-            return TimeSpan.FromSeconds((testSeconds * RepeatCount + WarmSeconds) * repeatCountPerSuite);
+            return TimeSpan.FromSeconds((testSeconds * RepeatCount + warmSeconds) * repeatCountPerSuite);
         }
 
-        private static void RunSingleBenchmark(int firstCore, int secondCore, double testSeconds)
+        private static void RunSingleBenchmark(int firstCore, int secondCore, double testSeconds, double warmSeconds)
         {
             var allRunners = new List<CoreRunner>();
             allRunners.Add(new CoreRunner(firstCore, Run));
@@ -73,7 +72,7 @@ namespace CpuThreadingTest.ConsoleApp
 
             var warmFinishSource = new CancellationTokenSource();
             warmFinishSource.Token.Register(() => CompletePhase(testSeconds));
-            warmFinishSource.CancelAfter(TimeSpan.FromSeconds(WarmSeconds));
+            warmFinishSource.CancelAfter(TimeSpan.FromSeconds(warmSeconds));
 
             _cancelSource = warmFinishSource;
 

@@ -5,11 +5,16 @@ using System.Threading;
 
 namespace CpuThreadingTest.ConsoleApp
 {
-    public static class CpuInfoReporter
+    public sealed class CpuInfoDetector : IDetector
     {
         private const UInt64 Int64Lastbit = 9223372036854775808;
 
-        public static void DisplayCpuInfo()
+        public TimeSpan CalculateTime(double secondsPerMeasure, double warmSeconds)
+        {
+            return TimeSpan.Zero;
+        }
+
+        public void Perform(double secondsPerMeasure, double warmSeconds)
         {
             Console.WriteLine("General processor info:");
 

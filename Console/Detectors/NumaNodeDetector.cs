@@ -3,22 +3,21 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 
-namespace CpuThreadingTest.ConsoleApp
+namespace CpuThreadingTest.ConsoleApp.Detectors
 {
-    public static class NumaNodeDetectorTests
+    internal sealed class NumaNodeDetector : IDetector
     {
         private const int DwordsCount = 1024 * 1024 * 1024 * 1 / 4; //1Gb
         private const int RepeatCount = 5;
-        private const int WarmingSeconds = 3;
         private static readonly Random Rnd = new Random();
         private static readonly int ProcessorCount = Environment.ProcessorCount;
-        
+
         private static int[] _memory;
         private static readonly double[] _results = new double[ProcessorCount];
         private static int _completed;
         private static CancellationTokenSource _cancelSource;
 
-        public static void Perform(double secondsPerTest)
+        public void Perform(double secondsPerTest, double warmSeconds)
         {
             Reporter.DisplayStartTests("NUMA");
 
@@ -30,7 +29,7 @@ namespace CpuThreadingTest.ConsoleApp
 
             for (int i = 0; i < ProcessorCount; i++)
             {
-                Run(i, secondsPerTest);
+                Run(i, secondsPerTest, warmSeconds);
                 Reporter.DisplayOneTestItemDone();
             }
 
@@ -39,15 +38,15 @@ namespace CpuThreadingTest.ConsoleApp
             Reporter.DisplayNumaTestResults(_results);
         }
 
-        public static TimeSpan CalculateTime(double testSeconds)
+        public TimeSpan CalculateTime(double testSeconds, double warmSeconds)
         {
-            return TimeSpan.FromSeconds((testSeconds * RepeatCount + WarmingSeconds) * ProcessorCount);
+            return TimeSpan.FromSeconds((testSeconds * RepeatCount + warmSeconds) * ProcessorCount);
         }
 
         private static int[] InitializeMemory()
         {
             var memory = new int[DwordsCount];
-            
+
             for (int i = 0; i < memory.Length; i++)
             {
                 memory[i] = Rnd.Next(500);
@@ -56,7 +55,7 @@ namespace CpuThreadingTest.ConsoleApp
             return memory;
         }
 
-        private static void Run(int coreIndex, double testSeconds)
+        private static void Run(int coreIndex, double testSeconds, double warmSeconds)
         {
             GC.Collect(2);
 
@@ -67,7 +66,7 @@ namespace CpuThreadingTest.ConsoleApp
 
             var warmFinishSource = new CancellationTokenSource();
             warmFinishSource.Token.Register(() => CompletePhase(testSeconds));
-            warmFinishSource.CancelAfter(TimeSpan.FromSeconds(WarmingSeconds));
+            warmFinishSource.CancelAfter(TimeSpan.FromSeconds(warmSeconds));
 
             _cancelSource = warmFinishSource;
 
