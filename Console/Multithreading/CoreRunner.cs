@@ -25,6 +25,8 @@ namespace CpuThreadingTest.ConsoleApp
             _thread = CreateThread();
         }
 
+        public int CoreIndex => _coreIndex;
+
         public void Start()
         {
             _thread.Start();

@@ -228,8 +228,10 @@ namespace CpuThreadingTest.ConsoleApp
             Console.WriteLine("Performing tests...");
         }
 
-        public static void DisplayNumaTestResults(double[] results)
+        public static void DisplayNumaTestResults(double[,] allResults)
         {
+            var results = MaxResultsPerCore(allResults);
+
             Console.WriteLine();
             Console.WriteLine("Accessing to the 'local' memory for NUMA socket is faster than accessing to the ");
             Console.WriteLine("other's NUMA socket memory.");
@@ -248,6 +250,31 @@ namespace CpuThreadingTest.ConsoleApp
 
             Console.WriteLine();
             Console.WriteLine();
+        }
+
+        private static double[] MaxResultsPerCore(double[,] allResults)
+        {
+            var repeatCount = allResults.GetLength(1);
+            var length = allResults.GetLength(0);
+
+            var results = new double[length];
+
+            for (int i = 0; i < length; i++)
+            {
+                var max = allResults[i, 0];
+
+                for (int j = 1; j < repeatCount; j++)
+                {
+                    if (allResults[i, j] > max)
+                    {
+                        max = allResults[i, j];
+                    }
+                }
+
+                results[i] = max;
+            }
+
+            return results;
         }
     }
 }
